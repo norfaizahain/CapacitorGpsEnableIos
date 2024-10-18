@@ -13,43 +13,14 @@ npx cap sync
 
 <docgen-index>
 
-* [`echo(...)`](#echo)
-* [`isGpsEnabled()`](#isgpsenabled)
 * [`requestPermissions()`](#requestpermissions)
-* [`addListener('cancelAction' | 'locationStatusChange', ...)`](#addlistenercancelaction--locationstatuschange-)
+* [`addListener('cancelAction' | 'locationStatusChange' | 'mockLocationDetected', ...)`](#addlistenercancelaction--locationstatuschange--mocklocationdetected-)
 * [Interfaces](#interfaces)
-* [Type Aliases](#type-aliases)
 
 </docgen-index>
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
-
-### echo(...)
-
-```typescript
-echo(options: { value: string; }) => Promise<{ value: string; }>
-```
-
-| Param         | Type                            |
-| ------------- | ------------------------------- |
-| **`options`** | <code>{ value: string; }</code> |
-
-**Returns:** <code>Promise&lt;{ value: string; }&gt;</code>
-
---------------------
-
-
-### isGpsEnabled()
-
-```typescript
-isGpsEnabled() => Promise<GpsIsEnabled>
-```
-
-**Returns:** <code>Promise&lt;true&gt;</code>
-
---------------------
-
 
 ### requestPermissions()
 
@@ -60,16 +31,16 @@ requestPermissions() => Promise<void>
 --------------------
 
 
-### addListener('cancelAction' | 'locationStatusChange', ...)
+### addListener('cancelAction' | 'locationStatusChange' | 'mockLocationDetected', ...)
 
 ```typescript
-addListener(eventName: 'cancelAction' | 'locationStatusChange', listenerFunc: (info: any) => any) => Promise<PluginListenerHandle>
+addListener(eventName: 'cancelAction' | 'locationStatusChange' | 'mockLocationDetected', listenerFunc: (info: any) => any) => Promise<PluginListenerHandle>
 ```
 
-| Param              | Type                                                  |
-| ------------------ | ----------------------------------------------------- |
-| **`eventName`**    | <code>'cancelAction' \| 'locationStatusChange'</code> |
-| **`listenerFunc`** | <code>(info: any) =&gt; any</code>                    |
+| Param              | Type                                                                            |
+| ------------------ | ------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'cancelAction' \| 'locationStatusChange' \| 'mockLocationDetected'</code> |
+| **`listenerFunc`** | <code>(info: any) =&gt; any</code>                                              |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -84,13 +55,5 @@ addListener(eventName: 'cancelAction' | 'locationStatusChange', listenerFunc: (i
 | Prop         | Type                                      |
 | ------------ | ----------------------------------------- |
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
-
-
-### Type Aliases
-
-
-#### GpsIsEnabled
-
-<code>true</code>
 
 </docgen-api>

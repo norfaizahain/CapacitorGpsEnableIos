@@ -13,14 +13,15 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
     var permissionCallID: String?
     public var window: UIWindow?
     var currentView: UIView!
-
+    var isAlertVisible: Bool = false
     // default set value so dont touch
     public let identifier: String = "CapacitorGpsEnableIosPlugin"
     public let jsName: String = "CapacitorGpsEnableIos"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "echo", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "isGpsEnabled", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise)
+        // CAPPluginMethod(name: "echo", returnType: CAPPluginReturnPromise),
+        // CAPPluginMethod(name: "isGpsEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dismissAlert", returnType: CAPPluginReturnPromise)
     ]
     private let implementation: CapacitorGpsEnableIos = CapacitorGpsEnableIos()
 
@@ -30,18 +31,18 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
         locationManager.delegate = self
     }
 
-    @objc func echo(_ call: CAPPluginCall) {
-        let value = call.getString("value") ?? ""
-        call.resolve([
-            "value": implementation.echo(value)
-        ])
-    }
-    @objc func isGpsEnabled(_ call: CAPPluginCall) {
-        let status: Bool = CLLocationManager.locationServicesEnabled()
-        call.resolve([
-            "enabled": status
-        ])
-    }
+    // @objc func echo(_ call: CAPPluginCall) {
+    //     let value = call.getString("value") ?? ""
+    //     call.resolve([
+    //         "value": implementation.echo(value)
+    //     ])
+    // }
+    // @objc func isGpsEnabled(_ call: CAPPluginCall) {
+    //     let status: Bool = CLLocationManager.locationServicesEnabled()
+    //     call.resolve([
+    //         "enabled": status
+    //     ])
+    // }
     public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
           print(permissionCallID)
          if let callID: String = permissionCallID, let call = bridge?.savedCall(withID:callID) {
@@ -90,10 +91,12 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
             let locationManager = CLLocationManager()
 
             // Check for accuracy authorization if on iOS 14+
+        
             if #available(iOS 14.0, *) {
                 if locationManager.accuracyAuthorization == .fullAccuracy {
                     locationState = "granted"  // Precise location is enabled
                     print("Precise location is enabled")
+                    self.checkMockLocation()
                 } else {
                     locationState = "reducedAccuracy"  // Precise location is disabled
                     print("Precise location is disabled")
@@ -121,29 +124,57 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
         }
        
         DispatchQueue.main.async {
-        let alert = UIAlertController(
-            title: "Location Services Disabled",
-            message: textMessage,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Settings", style: .default) { _ in
-            if let settingsUrl = url {
-                UIApplication.shared.open(settingsUrl)
+            let alert = UIAlertController(
+                title: "Location Services Disabled",
+                message: textMessage,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "Settings", style: .default) { _ in
+                if let settingsUrl = url {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            })
+    
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {  // 0.5-second delay before notifying cancel
+                    print("Notifying cancel action after delay")
+                    self.notifyCancelAction()
+                }
+            })
+            await self.isAlertVisible = true
+            self.bridge?.viewController?.present(alert, animated: true){
+                self.isAlertVisible = true
             }
-        })
-  
-         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {  // 0.5-second delay before notifying cancel
-                print("Notifying cancel action after delay")
-                self.notifyCancelAction()
-            }
-        })
-        
-        self.bridge?.viewController?.present(alert, animated: true)
         }
 
     }
     func notifyCancelAction() {
         self.notifyListeners("cancelAction", data: ["data":"true"])
+    }
+    func checkMockLocation(){
+        if #available(iOS 15.0, *) {
+            let isLocationSimulated: Bool = locationManager.location?.sourceInformation?.isSimulatedBySoftware ?? false
+            let isProducedByAccess: Bool = locationManager.location?.sourceInformation?.isProducedByAccessory ?? false
+            let info = CLLocationSourceInformation(softwareSimulationState: isLocationSimulated, andExternalAccessoryState: isProducedByAccess)
+            print("location simulation info \(info)")
+            if info.isSimulatedBySoftware == true || info.isProducedByAccessory == true{
+
+                self.notifyListeners("mockLocationDetected", data: ["isMock": true])
+
+            } else {
+
+                self.notifyListeners("mockLocationDetected", data: ["isMock": false])
+
+            }
+
+        }
+    }
+    @obj public func dismissAlert(_ call: CAPPluginCall) {
+        if isAlertVisible {
+            self.bridge?.viewController?.dismiss(animated: true) {
+                print("Alert dismissed programmatically")
+                self.isAlertVisible = false  // Reset flag when the alert is dismissed
+            }
+        }
     }
 }
