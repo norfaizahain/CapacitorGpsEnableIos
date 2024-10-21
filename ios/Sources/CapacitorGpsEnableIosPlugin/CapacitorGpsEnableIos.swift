@@ -14,4 +14,8 @@ import Foundation
     @objc public func dismissAlert(_ value: String) {
         print("event: \(value)")
     }
+    @objc public func checkLocationStatus(_ value: String){
+        print("event: \(value)")
+    }
+
 }

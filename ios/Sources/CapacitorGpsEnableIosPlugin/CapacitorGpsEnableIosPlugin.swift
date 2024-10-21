@@ -9,7 +9,8 @@ import Capacitor
  */
 @objc(CapacitorGpsEnableIosPlugin)
 public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate{
-    var locationManager: CLLocationManager!
+    var locationManager : CLLocationManager!
+    var lastKnownLocation: CLLocation?
     var permissionCallID: String?
     public var window: UIWindow?
     var currentView: UIView!
@@ -21,35 +22,40 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
         // CAPPluginMethod(name: "echo", returnType: CAPPluginReturnPromise),
         // CAPPluginMethod(name: "isGpsEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "dismissAlert", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "dismissAlert", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkLocationStatus", returnType: CAPPluginReturnPromise)
     ]
     private let implementation: CapacitorGpsEnableIos = CapacitorGpsEnableIos()
 
     override public func load() {
-        super.load()
+       super.load()
         locationManager = CLLocationManager()
         locationManager.delegate = self
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
     }
 
-    // @objc func echo(_ call: CAPPluginCall) {
-    //     let value = call.getString("value") ?? ""
-    //     call.resolve([
-    //         "value": implementation.echo(value)
-    //     ])
-    // }
-    // @objc func isGpsEnabled(_ call: CAPPluginCall) {
-    //     let status: Bool = CLLocationManager.locationServicesEnabled()
-    //     call.resolve([
-    //         "enabled": status
-    //     ])
-    // }
+   
     public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-          print(permissionCallID)
+//          print(permissionCallID)
          if let callID: String = permissionCallID, let call = bridge?.savedCall(withID:callID) {
              print("callID ada")
             checkPermissions(call)
              bridge?.releaseCall(call)
          }
+    }
+    @objc func startLocationUpdates(_ call: CAPPluginCall) {
+        locationManager.startUpdatingLocation()
+        call.resolve([
+            "message": "Started location updates"
+        ])
+    }
+
+    @objc func stopLocationUpdates(_ call: CAPPluginCall) {
+        locationManager.stopUpdatingLocation()
+        call.resolve([
+            "message": "Stopped location updates"
+        ])
     }
     @objc public override func requestPermissions(_ call: CAPPluginCall) {
         
@@ -75,6 +81,46 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
         
 
     }
+     @objc func checkLocationStatus(_ call: CAPPluginCall) {
+        locationManager.delegate = self
+
+        // Request the current location
+        locationManager.requestLocation()
+        
+        guard let currentLocation = locationManager.location else {
+            call.resolve([
+                "locationEnabled": false,
+                "message": "Unable to fetch current location"
+            ])
+            return
+        }
+
+        let currentLatitude = currentLocation.coordinate.latitude
+        let currentLongitude = currentLocation.coordinate.longitude
+        
+        var locationChanged = false
+        
+        // Compare current location with the last known location
+        if let lastLocation = lastKnownLocation {
+            let distance = currentLocation.distance(from: lastLocation)
+            
+            if distance > 50 { // Adjust the threshold (in meters) for what counts as a "sudden change"
+                locationChanged = true
+                self.checkMockLocation()
+            }
+        }
+
+        // Update the last known location
+        lastKnownLocation = currentLocation
+        
+        call.resolve([
+            "locationEnabled": true,
+            "latitude": currentLatitude,
+            "longitude": currentLongitude,
+            "locationChanged": locationChanged,
+            "message": locationChanged ? "Location changed" : "Location not changed"
+        ])
+    }
     @objc public override func checkPermissions(_ call: CAPPluginCall) {
 
         let locationState: String
@@ -91,12 +137,12 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
             let locationManager = CLLocationManager()
 
             // Check for accuracy authorization if on iOS 14+
-        
+            self.checkMockLocation()
             if #available(iOS 14.0, *) {
                 if locationManager.accuracyAuthorization == .fullAccuracy {
                     locationState = "granted"  // Precise location is enabled
                     print("Precise location is enabled")
-                    self.checkMockLocation()
+                   
                 } else {
                     locationState = "reducedAccuracy"  // Precise location is disabled
                     print("Precise location is disabled")
@@ -112,6 +158,14 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
 
         
     }
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+          // You can leave this method empty if not needed
+          print("Updated locations: \(locations)")
+      }
+    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+           // Handle location error if needed
+           print("Failed to update location: \(error)")
+       }
     func showEnableLocationAlert(_ type : String) {
         var url = URL(string: UIApplication.openSettingsURLString);
         var textMessage = "Please enable location services in Settings to allow the app to access your location."
@@ -123,7 +177,7 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
             textMessage = "Please enable the 'Precise Location' services in location Settings to allow the app to access your location accurately."
         }
        
-        DispatchQueue.main.async {
+        DispatchQueue.main.async{
             let alert = UIAlertController(
                 title: "Location Services Disabled",
                 message: textMessage,
@@ -141,8 +195,9 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
                     self.notifyCancelAction()
                 }
             })
-            await self.isAlertVisible = true
+            self.isAlertVisible = false
             self.bridge?.viewController?.present(alert, animated: true){
+                print("hey you")
                 self.isAlertVisible = true
             }
         }
@@ -169,8 +224,11 @@ public class CapacitorGpsEnableIosPlugin: CAPPlugin, CAPBridgedPlugin, CLLocatio
 
         }
     }
-    @obj public func dismissAlert(_ call: CAPPluginCall) {
+    @objc func dismissAlert(_ call: CAPPluginCall) {
+        print("masuk dismissAlert")
+        print(isAlertVisible)
         if isAlertVisible {
+            print("masuk isAlertVisible")
             self.bridge?.viewController?.dismiss(animated: true) {
                 print("Alert dismissed programmatically")
                 self.isAlertVisible = false  // Reset flag when the alert is dismissed
