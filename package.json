@@ -1,6 +1,6 @@
 {
   "name": "capacitor-gps-enable-ios",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ios location permission",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
